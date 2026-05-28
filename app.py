@@ -1,5 +1,7 @@
 import gradio as gr
+import config
 from rag_engine import RAGEngine
+from llm_client import LLMClient
 from data_loader import load_all_data
 
 engine = RAGEngine()
@@ -11,6 +13,8 @@ SOURCE_FILTER_MAP = {
     "课程视频": "video",
     "微信群答疑": "wechat",
 }
+BACKEND_CHOICES = ["ollama", "api"]
+PROVIDER_CHOICES = ["siliconflow", "dashscope", "openai", "custom"]
 
 
 def build_index():
@@ -20,6 +24,24 @@ def build_index():
     engine.build_index(docs)
     stats = engine.get_stats()
     return f"Index built: {stats['total']} documents"
+
+
+def apply_llm_config(backend, provider, api_key, custom_url, custom_model):
+    try:
+        config.LLM_BACKEND = backend
+        config.API_PROVIDER = provider
+        config.API_KEY = api_key
+
+        if provider == "custom":
+            config.API_PROVIDERS["custom"]["base_url"] = custom_url
+            config.API_PROVIDERS["custom"]["model"] = custom_model
+        else:
+            config.LLM_MODEL = config.API_PROVIDERS[provider]["model"]
+
+        engine.llm = LLMClient(backend=backend)
+        return f"LLM 已切换: {backend} / {provider}"
+    except Exception as e:
+        return f"配置失败: {e}"
 
 
 def chat(message, history, source_filter):
@@ -52,6 +74,13 @@ def get_stats():
     return "\n".join(lines)
 
 
+def on_provider_change(provider):
+    if provider == "custom":
+        return gr.update(visible=True), gr.update(visible=True)
+    else:
+        return gr.update(visible=False), gr.update(visible=False)
+
+
 with gr.Blocks(title="AI助教 RAG 问答系统") as demo:
     gr.Markdown("# AI助教 RAG 问答系统")
     gr.Markdown("基于 Coze知识库、课程视频、微信群答疑 的智能问答系统")
@@ -70,6 +99,38 @@ with gr.Blocks(title="AI助教 RAG 问答系统") as demo:
                 clear_btn = gr.Button("清空对话")
 
         with gr.Column(scale=2):
+            gr.Markdown("### LLM 配置")
+            with gr.Group():
+                backend_dropdown = gr.Dropdown(
+                    choices=BACKEND_CHOICES,
+                    value=config.LLM_BACKEND,
+                    label="后端模式",
+                )
+                provider_dropdown = gr.Dropdown(
+                    choices=PROVIDER_CHOICES,
+                    value=config.API_PROVIDER,
+                    label="API 提供商",
+                    visible=(config.LLM_BACKEND == "api"),
+                )
+                api_key_input = gr.Textbox(
+                    label="API Key",
+                    type="password",
+                    placeholder="输入 API Key 或设置 LLM_API_KEY 环境变量",
+                    visible=(config.LLM_BACKEND == "api"),
+                )
+                custom_url_input = gr.Textbox(
+                    label="自定义 Base URL",
+                    placeholder="https://your-api.com/v1",
+                    visible=False,
+                )
+                custom_model_input = gr.Textbox(
+                    label="自定义模型名称",
+                    placeholder="model-name",
+                    visible=False,
+                )
+                apply_btn = gr.Button("应用配置", variant="secondary")
+                config_status = gr.Markdown(value="")
+
             gr.Markdown("### 检索来源")
             source_display = gr.Markdown(value="暂无检索结果")
             index_status = gr.Markdown(value="")
@@ -77,6 +138,21 @@ with gr.Blocks(title="AI助教 RAG 问答系统") as demo:
                 build_btn = gr.Button("构建索引")
                 stats_btn = gr.Button("查看索引状态")
 
+    backend_dropdown.change(
+        lambda b: (gr.update(visible=(b == "api")), gr.update(visible=(b == "api"))),
+        inputs=[backend_dropdown],
+        outputs=[provider_dropdown, api_key_input],
+    )
+    provider_dropdown.change(
+        on_provider_change,
+        inputs=[provider_dropdown],
+        outputs=[custom_url_input, custom_model_input],
+    )
+    apply_btn.click(
+        apply_llm_config,
+        inputs=[backend_dropdown, provider_dropdown, api_key_input, custom_url_input, custom_model_input],
+        outputs=[config_status],
+    )
     msg_input.submit(
         chat,
         inputs=[msg_input, chatbot, source_dropdown],

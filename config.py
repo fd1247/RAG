@@ -16,11 +16,34 @@ DATA_FILES = {
 EMBEDDING_MODEL = "C:/Users/xin/.cache/modelscope/AI-ModelScope/bge-small-zh-v1___5"
 
 # LLM settings
-LLM_BACKEND = "ollama"  # "ollama" or "api"
+# Backend: "ollama" (local) or "api" (online)
+# API providers: "siliconflow", "dashscope", "openai", "custom"
+LLM_BACKEND = "ollama"
 LLM_MODEL = "qwen3.5:4b"
+
 # API settings (used when LLM_BACKEND="api")
-API_BASE_URL = "https://api.siliconflow.cn/v1"
-API_KEY = ""  # Fill in your API key if using API backend
+API_PROVIDER = "siliconflow"  # "siliconflow" / "dashscope" / "openai" / "custom"
+API_KEY = ""  # Set via environment variable LLM_API_KEY or fill here
+
+# Pre-configured API providers
+API_PROVIDERS = {
+    "siliconflow": {
+        "base_url": "https://api.siliconflow.cn/v1",
+        "model": "Qwen/Qwen2.5-7B-Instruct",
+    },
+    "dashscope": {
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-plus",
+    },
+    "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+    },
+    "custom": {
+        "base_url": "",
+        "model": "",
+    },
+}
 
 # RAG settings
 CHROMA_COLLECTION = "ai_teaching_assistant"

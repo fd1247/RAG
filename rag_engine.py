@@ -1,3 +1,4 @@
+import time
 from config import RETRIEVAL_TOP_K, CONTEXT_MAX_CHARS
 from embedder import Embedder
 from vector_store import VectorStore
@@ -72,8 +73,13 @@ class RAGEngine:
         if self.collection is None:
             self.collection = self.vector_store.get_or_create_collection(self.embedder)
 
+        t0 = time.time()
+
         query_embedding = self.embedder.embed_query(user_question)
+        t1 = time.time()
+
         results = self.vector_store.search(self.collection, query_embedding, top_k, source_filter)
+        t2 = time.time()
 
         context = build_context(results)
         sources = build_source_list(results)
@@ -84,6 +90,10 @@ class RAGEngine:
             self.llm = LLMClient()
 
         answer = self.llm.generate(prompt)
+        t3 = time.time()
+
+        print(f"[RAG 耗时] Embedding: {t1-t0:.2f}s | 检索: {t2-t1:.2f}s | LLM生成: {t3-t2:.2f}s | 总计: {t3-t0:.2f}s")
+
         return answer, sources
 
     def get_stats(self) -> dict:
